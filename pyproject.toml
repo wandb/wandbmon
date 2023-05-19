@@ -1,0 +1,30 @@
+
+[project]
+name = "wandbmon"
+version = "0.1.0"
+description = "A library for monitoring models at inference time"
+authors = [
+    {name = "Weights & Biases", email = "support@wandb.com"},
+]
+# "weave @ git+ssh://git@github.com/wandb/weave-internal.git@master"
+dependencies = [
+    "wandb>=0.15.2",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+
+[project.optional-dependencies]
+vision = ["Pillow"] 
+
+[tool.pdm.dev-dependencies]
+lint = ["ruff", "black==23.3.0"]
+test = ["pytest", "pytest-cov"]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.ruff]
+max-length = 180
+ignore = ["E711"]
