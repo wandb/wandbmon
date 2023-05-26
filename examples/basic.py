@@ -20,6 +20,6 @@ class Model:
 if __name__ == "__main__":
     configure_logging(logging.DEBUG)
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    model = Model("test")
+    model = Model("test-hf:v0")
     for i in range(100):
         model.predict([random.random() for _ in range(100)])

@@ -19,7 +19,7 @@ vision = ["Pillow"]
 
 [tool.pdm.dev-dependencies]
 lint = ["ruff", "black==23.3.0"]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "pytest-mock"]
 
 [build-system]
 requires = ["pdm-backend"]
