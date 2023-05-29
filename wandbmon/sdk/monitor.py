@@ -66,7 +66,7 @@ class Monitor:
     def __init__(self, 
         fn: Callable[..., Any],
         input_preprocessor: Optional[Callable[..., Any]] = None,
-        output_postprocessor: Optional[Callable[..., Any]] = None, 
+        output_postprocessor: Optional[Callable[..., Any]] = None,
         config: Union[Dict, None] = None,
         settings: Union[wandb.Settings, Dict[str, Any], None] = None,
         auto_commit: bool = True):
@@ -80,6 +80,7 @@ class Monitor:
         self.input_preprocessor = input_preprocessor
         self.output_postprocessor = output_postprocessor
         self.auto_commit = auto_commit
+        self.wandb_silent: bool = True
 
         self.logged_count = 0
         self.last_saved_timestamp = datetime.datetime.now() - datetime.timedelta(seconds=Monitor.MAX_UNSAVED_SECONDS*2)
@@ -216,7 +217,7 @@ class Monitor:
         with self._lock:
             logger.info('syncing %s records', self.unsaved_count)
             for r in self._iterate_records():
-                wandb.log(r.as_dict())
+                self.run.log(r.as_dict())
                 self.logged_count += 1
             self.last_saved_timestamp = datetime.datetime.now()
             self._maybe_rotate_run()
@@ -224,35 +225,45 @@ class Monitor:
     def finish(self):
         self._join_event.set()
         self._thread.join()
+    
+    def _init_run(self) -> wandb.sdk.wandb_run.Run:
+        run = wandb.init(config=self.config, settings=self.settings, job_type='monitor')
+        if self.config.get("model_name", None):
+            try:
+                run.use_artifact(self.config["model_name"])
+            except wandb.errors.CommError as e:
+                # the model name might not be a valid wandb artifact, catch the error and move on
+                pass
+        
+        if not self.wandb_silent:
+            print(f'Find your run at {run.url}', file=sys.stderr)
+        return run
 
     def _ensure_run(self) -> wandb.sdk.wandb_run.Run:
-        if wandb.run is None:
+        if self.run is None:
             logger.info('initializing run')
             default_settings = {"project": "monitor", "silent": True}
-            wandb_silent = None
             if self.settings is not None:
-                wandb_silent = self.settings.get('silent')
+                self.wandb_silent = self.settings.get('silent')
                 if not isinstance(self.settings, wandb.Settings):
                     default_settings.update(self.settings)
                     logger.debug('applying custom settings %s', self.settings)
                     self.settings = wandb.Settings(**default_settings)
             # TODO: silence Settings object?
             self.settings = self.settings or default_settings
-            wandb.init(config=self.config, settings=self.settings, job_type='monitor')
-            if wandb_silent is None:
-                print(f'Find your run at {wandb.run.url}', file=sys.stderr)
-        return wandb.run
+            self.run = self._init_run()
+        return self.run
 
     def _maybe_rotate_run(self) -> bool:
-        if self.logged_count > self.MAX_LOGGED_COUNT:
-            config = dict(wandb.run.config)  # type: ignore[union-attr]
-            settings = copy.copy(wandb.run._settings)  # type: ignore[union-attr]
+        if self.run is not None and self.logged_count > self.MAX_LOGGED_COUNT:
+            config = dict(self.run.config)  # type: ignore[union-attr]
+            settings = copy.copy(self.run._settings)  # type: ignore[union-attr]
             settings.update({"run_id": None})
-            logger.info('rotating run: %s', wandb.run.id)
+            logger.info('rotating run: %s', self.run.id)
             wandb.finish()
             self._flush_count = 0
             # TODO: verify this is actually enough
-            wandb.init(config=config, settings=settings, job_type='monitor')
+            self._init_run()
             return True
         else:
             return False
@@ -276,13 +287,14 @@ def monitor(
             returns a dictionary of key value pairs to log.
         output_postprocessor (Callable[..., Any]):  A function that takes the return value of the decorated function
             and returns a dictionary or single value to log.
-        config (dict):  Sets the config parameters for the wandb.run created
+        config (dict):  Sets the config parameters for the wandb.run created. If a "model_name" key is set, the wandb.run will
+            attempt to use the "model_name" as a source artifact for lineage tracking.
         settings (dict, wandb.Settings):  A wandb.Settings object or dictionary to configure the run
     """
 
     def decorator(fn: Callable[..., Any]):
         logger.debug('decorating %s', fn)
-        return Monitor(fn, input_preprocessor, output_postprocessor, 
+        return Monitor(fn, input_preprocessor, output_postprocessor,
             config=config, settings=settings, auto_commit=commit)
 
     return decorator
