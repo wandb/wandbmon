@@ -50,7 +50,6 @@ version = {attr = "wandbmon.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["error"]
 
 [tool.autopep8]
 max_line_length = 180

@@ -1,0 +1,2 @@
+graft wandbmon
+global-exclude *.pyc
