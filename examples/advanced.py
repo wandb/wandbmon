@@ -13,14 +13,14 @@ def postprocess(image):
 @monitor(
     input_preprocessor=preprocess,
     output_postprocessor=postprocess,
-    settings={"project": "wandbmon-img"},
-    config={"model_name": "test"},
     commit=False)
 def predict(image):
     return image / 2
 
 
 if __name__ == "__main__":
+    wandb.init(project="wandbmon-img", config={"model_name": "test"})
+    
     for i in range(10):
         img = np.random.randint(255, size=(28, 28, 3))
         res = predict(img)
